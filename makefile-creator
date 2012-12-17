@@ -1,0 +1,70 @@
+#!/usr/bin/python
+
+import os,sys
+from stat import *
+import random
+import re
+
+def listFiles(dirName, ext):
+    files = []
+    for f in os.listdir(dirName):
+        filename = os.path.join(dirName,f)
+        mode = os.stat(filename).st_mode
+        
+        if S_ISDIR(mode):
+            files += listFiles(filename, ext)
+        elif S_ISREG(mode):
+            if f.endswith(ext):
+                files.append(filename)
+    return files
+
+def listCPPFiles(dirName):
+    return [{"filename":f, "compiler":"CPPCOMPILER"} for f in listFiles(dirName, '.cpp')]
+
+def listCFiles(dirName):
+    return [{"filename":f, "compiler":"CCOMPILER"} for f in listFiles(dirName, '.c')]
+
+def scanIncludes(line,basePath):
+    if not line.startswith("#include"):
+        return None
+    m = re.search('^# *include *["](.*?)["].*',line)
+    if not m:
+        return None
+    return os.path.join(basePath,m.group(1).strip())
+    
+def buildDependencies(sourceFileDescList):
+    for i, sourceFileDesc in enumerate(sourceFileDescList):
+        filename = sourceFileDesc['filename']
+        basePath = filename[:filename.rfind(os.sep)]
+        includes = filter(None, [scanIncludes(y, basePath) for y in open(filename)])
+        sourceFileDesc.update({"includes":includes})
+    return sourceFileDescList
+
+def buildMakeFile(sources,params=None):
+    params = params or {}
+    for x in sources:
+        x.update({"objfile":x['filename'][:x['filename'].rfind('.')]+".o"})
+    
+    f = open('Makefile','w')
+    print >>f, "CPPCOMPILER=g++\n"
+    print >>f, "CCOMPILER=gcc\n"
+    print >>f, "COMPILEFLAGS=-Wall -g -O3\n"
+    print >>f, "UNITS=%s"%' '.join(x['objfile'] for x in sources)
+    print >>f, ""
+    print >>f, "all : $(UNITS)"
+    print >>f, "\t$(CPPCOMPILER) $(COMPILEFLAGS) $(UNITS)"
+    for x in sources:
+        print >>f, x['objfile'],":", x['filename'],' '.join(x['includes'])
+        print x['objfile'], "<-", x['filename'], ' '.join(x['includes'])
+        print >>f, "\t$(%s) $(COMPILEFLAGS) -c %s -o %s"%(x['compiler'],x['filename'],x['objfile'])
+        print >>f, ""
+    print >>f, "clean:"
+    print >>f, "\trm -rf $(UNITS)"
+    f.close()
+    
+def main():
+    buildMakeFile(buildDependencies(listCPPFiles(".") + listCFiles(".")),{})
+    
+if __name__ == "__main__":
+    main()
+    #print listFiles('.','.cpp')
