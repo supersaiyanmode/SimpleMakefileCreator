@@ -27,32 +27,54 @@ def listCFiles(dirName):
 def scanIncludes(line,basePath):
     if not line.startswith("#include"):
         return None
-    m = re.search('^# *include *["](.*?)["].*',line)
+    m = re.search(r'^[ \t]*# *include *["](.*?)["].*',line)
     if not m:
         return None
     return os.path.join(basePath,m.group(1).strip())
-    
+
+def findIncludesRecursive(fileName, foundIncludes=None):
+    if foundIncludes is None:
+        foundIncludes = []
+        
+    with open(fileName) as f:
+        result = []
+        for line in f:
+            reRes = re.search(r'^[ \t]*# *include *["](.*?)["].*', line)
+            if reRes:
+                fullPath = os.path.join(os.path.dirname(fileName), reRes.group(1).strip())
+                if fullPath not in foundIncludes:
+                    foundIncludes.append(fullPath)
+                    result.append(fullPath)
+                    result = result + findIncludesRecursive(fullPath, foundIncludes)
+        return result
+
 def buildDependencies(sourceFileDescList):
     for i, sourceFileDesc in enumerate(sourceFileDescList):
-        filename = sourceFileDesc['filename']
-        basePath = filename[:filename.rfind(os.sep)]
-        includes = filter(None, [scanIncludes(y, basePath) for y in open(filename)])
-        sourceFileDesc.update({"includes":includes})
+        fileName = os.path.normpath(sourceFileDesc['filename'])
+        sourceFileDesc["filename"] = fileName
+        sourceFileDesc["includes"] = map(os.path.normpath, findIncludesRecursive(fileName))
     return sourceFileDescList
 
 def buildMakeFile(sources,params=None):
     params = params or {}
     for x in sources:
-        x.update({"objfile":x['filename'][:x['filename'].rfind('.')]+".o"})
+        x["objfile"] = x['filename'][:x['filename'].rfind('.')]+".o"
+        
+    libs = None
+    with open('Makefile', 'r') as f:
+        line = f.next()
+        if line.startswith('LIBS'):
+            libs = line.split('=')[1].strip()
     
     f = open('Makefile','w')
-    print >>f, "CPPCOMPILER=g++\n"
-    print >>f, "CCOMPILER=gcc\n"
-    print >>f, "COMPILEFLAGS=-Wall -g -O3\n"
+    print >>f, "LIBS=" + (libs or "")
+    print >>f, "CPPCOMPILER=g++"
+    print >>f, "CCOMPILER=gcc"
+    print >>f, "COMPILEFLAGS=-Wall -g -O3"
     print >>f, "UNITS=%s"%' '.join(x['objfile'] for x in sources)
     print >>f, ""
     print >>f, "all : $(UNITS)"
-    print >>f, "\t$(CPPCOMPILER) $(COMPILEFLAGS) $(UNITS)"
+    print >>f, "\t$(CPPCOMPILER) $(COMPILEFLAGS) $(UNITS) $(LIBS)"
     for x in sources:
         print >>f, x['objfile'],":", x['filename'],' '.join(x['includes'])
         print x['objfile'], "<-", x['filename'], ' '.join(x['includes'])
