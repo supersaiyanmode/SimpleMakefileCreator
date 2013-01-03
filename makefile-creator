@@ -24,14 +24,6 @@ def listCPPFiles(dirName):
 def listCFiles(dirName):
     return [{"filename":f, "compiler":"CCOMPILER"} for f in listFiles(dirName, '.c')]
 
-def scanIncludes(line,basePath):
-    if not line.startswith("#include"):
-        return None
-    m = re.search(r'^[ \t]*# *include *["](.*?)["].*',line)
-    if not m:
-        return None
-    return os.path.join(basePath,m.group(1).strip())
-
 def findIncludesRecursive(fileName, foundIncludes=None):
     if foundIncludes is None:
         foundIncludes = []
