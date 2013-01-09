@@ -50,7 +50,7 @@ def buildDependencies(sourceFileDescList):
 def buildMakeFile(sources,params=None):
     params = params or {}
     for x in sources:
-        x["objfile"] = x['filename'][:x['filename'].rfind('.')]+".o"
+        x["objfile"] = os.path.join("obj",x['filename'][:x['filename'].rfind('.')]+".o")
         
     defines = [
         ("LIBS",""),
@@ -60,17 +60,21 @@ def buildMakeFile(sources,params=None):
         ("DEFINES", ""),
     ]
     definesKeys = {defineKey[0]:index for index,defineKey in enumerate(defines)}
-    with open('Makefile', 'r') as f:
-        for line in f:
-            if not len(line.strip()):
-                break
-            if line.strip().startswith('#'):
-                continue
-            k,v = line.split('=')
-            if k in definesKeys:
-                defines[definesKeys[k]] = k, v.strip()
-            else:
-                defines.append((k,v))
+    try:
+        with open('Makefile', 'r') as f:
+            for line in f:
+                if not len(line.strip()):
+                    break
+                if line.strip().startswith('#'):
+                    continue
+                k,v = line.split('=')
+                if k in definesKeys:
+                    defines[definesKeys[k]] = k, v.strip()
+                else:
+                    defines.append((k,v))
+    except IOError, e:
+        pass
+    
     
     with open('Makefile','w') as f:
         print >>f, "#Below variable declarations will be maintained in all future Makefiles generated"
@@ -86,11 +90,13 @@ def buildMakeFile(sources,params=None):
         for x in sources:
             print >>f, x['objfile'],":", x['filename'],' '.join(x['includes'])
             #print x['objfile'], "<-", x['filename'], ' '.join(x['includes'])
+            print >>f, "\t@mkdir -p", os.path.dirname(x['objfile'])
             print >>f, "\t$(%s) $(COMPILEFLAGS) $(PREPROCESSORDEFINES) -c %s -o %s"% \
                         (x['compiler'],x['filename'],x['objfile'])
             print >>f, ""
         print >>f, "clean:"
-        print >>f, "\trm -rf $(UNITS)"
+        print >>f, "\t@rm -rf obj"
+        print >>f, "\t@echo Cleaned!"
         print "Makefile Generated."
     
 def main():
