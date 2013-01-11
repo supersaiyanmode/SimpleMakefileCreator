@@ -101,12 +101,12 @@ def buildMakeFile(sources,params=None):
         print >>f, ""
         print >>f, "#Do not make any changes below!!"
         print >>f, "PREPROCESSORDEFINES=$(patsubst %,-D%,$(DEFINES))"
-        print >>f, "UNITS=%s"%' '.join(x['objfile'] for x in sources)
+        print >>f, "UNITS= \\\n\t\t%s"%'\\\n\t\t'.join(x['objfile'] for x in sources)
         print >>f, ""
         print >>f, "all : $(UNITS)"
         print >>f, "\t$(CPPCOMPILER) $(COMPILEFLAGS) $(UNITS) $(LIBS)"
         for x in sources:
-            print >>f, x['objfile'],":", x['filename'],' '.join(x['includes'])
+            print >>f, x['objfile'],":", x['filename'], " \\\n\t\t",' \\\n\t\t'.join(x['includes'])
             #print x['objfile'], "<-", x['filename'], ' '.join(x['includes'])
             print >>f, "\t@mkdir -p", os.path.dirname(x['objfile'])
             print >>f, "\t$(%s) $(COMPILEFLAGS) $(PREPROCESSORDEFINES) -c %s -o %s"% \
