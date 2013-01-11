@@ -5,6 +5,9 @@ from stat import *
 import random
 import re
 
+class FileNotFoundException(Exception):
+    pass
+
 def listFiles(dirName, ext):
     files = []
     for f in os.listdir(dirName):
@@ -27,7 +30,7 @@ def listCFiles(dirName):
 def findIncludesRecursive(fileName, foundIncludes=None):
     if foundIncludes is None:
         foundIncludes = []
-        
+    
     with open(fileName) as f:
         result = []
         for line in f:
@@ -37,14 +40,29 @@ def findIncludesRecursive(fileName, foundIncludes=None):
                 if fullPath not in foundIncludes:
                     foundIncludes.append(fullPath)
                     result.append(fullPath)
-                    result = result + findIncludesRecursive(fullPath, foundIncludes)
+                    try:
+                        result = result + findIncludesRecursive(fullPath, foundIncludes)
+                    except IOError, e:
+                        f = FileNotFoundException()
+                        f.fileNames = [fullPath]
+                        raise f
+                    except FileNotFoundException, f:
+                        f.fileNames.append(fullPath)
+                        raise f
         return result
-
+    
 def buildDependencies(sourceFileDescList):
     for i, sourceFileDesc in enumerate(sourceFileDescList):
         fileName = os.path.normpath(sourceFileDesc['filename'])
         sourceFileDesc["filename"] = fileName
-        sourceFileDesc["includes"] = map(os.path.normpath, findIncludesRecursive(fileName))
+        try:
+            sourceFileDesc["includes"] = map(os.path.normpath, findIncludesRecursive(fileName))
+        except FileNotFoundException, f:
+            print>>sys.stderr, "Error: While processing file",fileName
+            print>>sys.stderr, ""
+            print>>sys.stderr, "Stack of includes:"
+            print>>sys.stderr, "\n".join(reversed(map(lambda x: "\t"+x, f.fileNames+[fileName])))
+            sys.exit(1)
     return sourceFileDescList
 
 def buildMakeFile(sources,params=None):
