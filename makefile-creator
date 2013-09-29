@@ -107,7 +107,7 @@ def buildMakeFile(sources):
         "BIN": "a.out",
         "INCPATH": "-I./",
         "LDFLAGS": "",
-        "LIBS":"-Wall -pedantic -g -O3",
+        "LIBS":"",
         "DEFINES": "",
         "COMPILEFLAGS": "-Wall -pedantic",
         "LINKFLAGS": ""
